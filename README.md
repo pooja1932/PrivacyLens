@@ -17,7 +17,7 @@ PrivacyLens/
 └── PrivacyLens_2Week_Project_Plan.docx  # Project Roadmap
 ```
 
-## 🛠️ Backend Setup (Person 2 Engine)
+## 🛠️ Backend Setup
 
 1. **Install Dependencies**:
    ```bash
@@ -34,7 +34,7 @@ PrivacyLens/
 3. **Test the Endpoint**:
    Visit `http://localhost:8000/docs` to test the API directly via Swagger UI.
 
-## 🤝 Team Integration (Person 1 & Person 3)
+## 🤝 Team Integration
 
-- **Person 1 (Extension)**: Send policy text via `POST /analyze` with body: `{"domain": "example.com", "policy_text": "..."}`.
-- **Person 3 (Web/DB)**: Extend `main.py` with MongoDB connections to cache domain scores.
+- **Extension**: Send policy text via `POST /analyze` with body: `{"domain": "example.com", "policy_text": "..."}`.
+- **Web/DB**: Extend `main.py` with MongoDB connections to cache domain scores.
