@@ -1,0 +1,19 @@
+# PrivacyLens Backend — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# ── Core API Framework ──────────────────────────────────────────────────
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-multipart==0.0.9     # required for FastAPI form parsing
+
+# ── NLP (Person 2) ─────────────────────────────────────────────────────
+spacy==3.7.4
+pydantic==2.7.1
+
+# ── LLM Clients (Person 2) ──────────────────────────────────────────────
+google-generativeai==0.7.2  # Gemini
+openai==1.40.0              # OpenAI fallback
+
+# ── Database & Caching (Person 3) ───────────────────────────────────────
+pymongo[srv]==4.8.0         # MongoDB Atlas (DNS seedlist connection string)
+python-dotenv==1.0.1        # Loads .env for local dev
