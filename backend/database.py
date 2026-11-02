@@ -111,6 +111,8 @@ def get_cached_policy(domain: str) -> Optional[dict]:
         doc = db["policies"].find_one({"domain": clean_domain})
         if doc:
             doc.pop("_id", None)        # strip BSON ObjectId
+            if isinstance(doc.get("analyzed_at"), datetime):
+                doc["analyzed_at"] = doc["analyzed_at"].isoformat()
             logger.info("Cache HIT (MongoDB): %s", clean_domain)
             return doc
         logger.info("Cache MISS (MongoDB): %s", clean_domain)
@@ -132,11 +134,14 @@ def save_policy(domain: str, analysis_result: dict) -> dict:
     """
     db = _get_db()
     clean_domain = _normalize_domain(domain)
+    now_dt = datetime.now(timezone.utc)
 
+    # For MongoDB, analyzed_at as datetime object triggers the TTL index.
+    # For JSON and memory cache, an ISO string is used.
     doc = {
         **analysis_result,
         "domain": clean_domain,
-        "analyzed_at": datetime.now(timezone.utc).isoformat(),
+        "analyzed_at": now_dt if db is not None else now_dt.isoformat(),
         "cached": True,
     }
 
@@ -151,7 +156,11 @@ def save_policy(domain: str, analysis_result: dict) -> dict:
         _memory_cache[clean_domain] = doc
         logger.info("Saved to memory cache: %s", clean_domain)
 
-    return doc
+    # Return with ISO string for consistent API output
+    out = dict(doc)
+    if isinstance(out.get("analyzed_at"), datetime):
+        out["analyzed_at"] = out["analyzed_at"].isoformat()
+    return out
 
 
 def get_leaderboard(
@@ -202,7 +211,11 @@ def get_leaderboard(
             .skip(skip)
             .limit(limit)
         )
-        return list(cursor)
+        results = list(cursor)
+        for item in results:
+            if isinstance(item.get("analyzed_at"), datetime):
+                item["analyzed_at"] = item["analyzed_at"].isoformat()
+        return results
 
     # ── in-memory fallback ──
     items = list(_memory_cache.values())
