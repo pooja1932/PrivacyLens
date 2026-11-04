@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrivacyLens</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Bar -->
+    <header class="app-header">
+      <div class="brand">
+        <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+        <span class="brand-title">PrivacyLens</span>
+        <span class="brand-tag">MV3</span>
+      </div>
+      <div class="header-actions">
+        <div id="backend-status-pill" class="status-pill status-checking" title="Backend connection status">
+          <span class="status-dot"></span>
+          <span id="backend-status-text">Checking</span>
+        </div>
+        <button id="btn-toggle-settings" class="btn-icon" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Collapsible Settings Panel -->
+    <div id="settings-panel" class="settings-panel hidden">
+      <div class="settings-content">
+        <div class="settings-title">Configuration</div>
+        <div class="setting-item">
+          <label for="input-backend-url">Backend API Endpoint</label>
+          <input type="text" id="input-backend-url" class="input-text" placeholder="http://localhost:8000" />
+        </div>
+        <div class="setting-item setting-checkbox">
+          <label for="check-mock-mode">
+            <input type="checkbox" id="check-mock-mode" />
+            <span>Enable Offline Simulation (Mock Mode)</span>
+          </label>
+        </div>
+        <div class="settings-buttons">
+          <button id="btn-test-connection" class="btn btn-secondary btn-sm">Test API</button>
+          <button id="btn-clear-cache" class="btn btn-secondary btn-sm">Clear Cache</button>
+          <button id="btn-save-settings" class="btn btn-primary btn-sm">Save</button>
+        </div>
+        <div id="settings-feedback" class="settings-feedback"></div>
+      </div>
+    </div>
+
+    <!-- Page Context Card -->
+    <div class="context-card">
+      <div class="context-header">
+        <span class="context-domain" id="page-domain">Scanning domain...</span>
+        <span id="page-badge" class="badge badge-neutral">Detecting</span>
+      </div>
+      <div class="context-url" id="page-url">Checking active browser tab...</div>
+    </div>
+
+    <!-- View: Initial State (No analysis yet) -->
+    <div id="view-initial" class="view-section">
+      <div id="policy-alert" class="alert-box alert-info hidden">
+        <div class="alert-title">
+          <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <span id="policy-alert-heading">Privacy Policy Found</span>
+        </div>
+        <div id="policy-alert-msg" class="alert-text">
+          A dedicated policy URL was detected on this website.
+        </div>
+        <div class="alert-actions">
+          <button id="btn-navigate-policy" class="btn btn-secondary btn-sm">Go to Policy Page</button>
+          <button id="btn-analyze-remote" class="btn btn-primary btn-sm">Analyze Remotely</button>
+        </div>
+      </div>
+
+      <div class="action-buttons-group">
+        <button id="btn-analyze-current" class="btn btn-primary btn-lg">
+          <svg class="icon-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <span>Analyze This Page</span>
+        </button>
+
+        <button id="btn-toggle-manual" class="btn btn-ghost btn-sm">
+          <span>Paste Custom Policy Text</span>
+        </button>
+      </div>
+
+      <!-- Collapsible Manual Input -->
+      <div id="manual-input-container" class="manual-container hidden">
+        <textarea id="manual-policy-text" class="textarea-input" placeholder="Paste privacy policy text here to run analysis..."></textarea>
+        <button id="btn-analyze-manual" class="btn btn-primary btn-sm btn-full">Analyze Pasted Text</button>
+      </div>
+    </div>
+
+    <!-- View: Loading / Progress State -->
+    <div id="view-loading" class="view-section hidden">
+      <div class="loading-container">
+        <div class="loading-progress-bar">
+          <div class="loading-progress-fill"></div>
+        </div>
+        <div class="loading-title">Auditing Privacy Policy</div>
+        <div class="loading-steps">
+          <div id="step-1" class="step-item step-active">
+            <span class="step-dot"></span>
+            <span>Extracting and cleaning DOM text</span>
+          </div>
+          <div id="step-2" class="step-item">
+            <span class="step-dot"></span>
+            <span>Executing deterministic NLP transparency checks</span>
+          </div>
+          <div id="step-3" class="step-item">
+            <span class="step-dot"></span>
+            <span>Extracting structured insights with AI pipeline</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- View: Error State -->
+    <div id="view-error" class="view-section hidden">
+      <div class="alert-box alert-danger">
+        <div class="alert-title">
+          <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span>Analysis Failed</span>
+        </div>
+        <div id="error-message-text" class="alert-text">
+          Could not complete policy audit.
+        </div>
+        <div class="alert-actions">
+          <button id="btn-error-retry" class="btn btn-secondary btn-sm">Retry Analysis</button>
+          <button id="btn-error-mock" class="btn btn-primary btn-sm">Use Mock Simulation</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- View: Results Dashboard -->
+    <div id="view-result" class="view-section hidden">
+      <!-- Trust Score Card -->
+      <div class="score-card">
+        <div class="score-main">
+          <div class="score-ring-container">
+            <svg class="score-ring" viewBox="0 0 100 100">
+              <circle class="ring-bg" cx="50" cy="50" r="42" />
+              <circle id="score-ring-indicator" class="ring-indicator" cx="50" cy="50" r="42" />
+            </svg>
+            <div class="score-text">
+              <span id="res-score-number" class="score-number">--</span>
+              <span class="score-denominator">/ 100</span>
+            </div>
+          </div>
+          <div class="score-meta">
+            <div id="res-score-grade" class="score-grade">Evaluating</div>
+            <div class="score-caption" id="res-score-caption">Trustworthiness Index</div>
+            <div class="score-badge-formula" id="res-formula-pill">Deterministic + AI Hybrid</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Metrics Grid -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-label">Transparency</div>
+          <div id="res-metric-transparency" class="metric-value">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Vague Phrases</div>
+          <div id="res-metric-vague" class="metric-value">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Word Count</div>
+          <div id="res-metric-words" class="metric-value">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Data Sold</div>
+          <div id="res-metric-sold" class="metric-value">--</div>
+        </div>
+      </div>
+
+      <!-- Accordion Section: AI Structured Insights -->
+      <div class="accordion">
+        <div class="accordion-item open" id="acc-ai">
+          <button class="accordion-header" type="button">
+            <div class="accordion-title">
+              <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
+                <rect x="9" y="9" width="6" height="6"/>
+                <line x1="9" y1="1" x2="9" y2="4"/>
+                <line x1="15" y1="1" x2="15" y2="4"/>
+                <line x1="9" y1="20" x2="9" y2="23"/>
+                <line x1="15" y1="20" x2="15" y2="23"/>
+                <line x1="20" y1="9" x2="23" y2="9"/>
+                <line x1="20" y1="14" x2="23" y2="14"/>
+                <line x1="1" y1="9" x2="4" y2="9"/>
+                <line x1="1" y1="14" x2="4" y2="14"/>
+              </svg>
+              <span>AI Risk Insights</span>
+            </div>
+            <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div class="accordion-body">
+            <!-- Data Sold Indicator -->
+            <div class="insight-row">
+              <span class="insight-label">Commercial Data Sale:</span>
+              <span id="res-data-sold-badge" class="badge badge-neutral">--</span>
+            </div>
+
+            <!-- Retention Period -->
+            <div class="insight-row">
+              <span class="insight-label">Retention Period:</span>
+              <span id="res-retention-text" class="insight-value">Not Specified</span>
+            </div>
+
+            <!-- Key Risks -->
+            <div class="insight-block">
+              <div class="insight-block-label">Identified Risks & Concerns:</div>
+              <ul id="res-risks-list" class="styled-list list-danger">
+                <li>No critical risks flagged.</li>
+              </ul>
+            </div>
+
+            <!-- Data Types Collected -->
+            <div class="insight-block">
+              <div class="insight-block-label">Data Types Collected:</div>
+              <div id="res-datatypes-chips" class="chip-container">
+                <span class="chip">None listed</span>
+              </div>
+            </div>
+
+            <!-- Third Party Sharing -->
+            <div class="insight-block">
+              <div class="insight-block-label">Third-Party Sharing:</div>
+              <div id="res-sharing-chips" class="chip-container">
+                <span class="chip">None listed</span>
+              </div>
+            </div>
+
+            <!-- User Rights -->
+            <div class="insight-block">
+              <div class="insight-block-label">User Rights Granted:</div>
+              <ul id="res-rights-list" class="styled-list list-success">
+                <li>Standard legal rights apply.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Accordion Section: Deterministic NLP Evidence -->
+        <div class="accordion-item" id="acc-rules">
+          <button class="accordion-header" type="button">
+            <div class="accordion-title">
+              <svg class="icon-inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+              <span>Deterministic NLP Evidence</span>
+            </div>
+            <svg class="accordion-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+          <div class="accordion-body">
+            <div class="insight-row">
+              <span class="insight-label">Rule-Based Vagueness Score:</span>
+              <span id="res-rule-score" class="insight-value font-mono">-- / 100</span>
+            </div>
+
+            <div class="insight-block">
+              <div class="insight-block-label">Detected Policy Sections:</div>
+              <div id="res-sections-chips" class="chip-container">
+                <span class="chip">general</span>
+              </div>
+            </div>
+
+            <div class="insight-block">
+              <div class="insight-block-label">Ambiguous / Weasel Terms Found:</div>
+              <div id="res-vague-terms-chips" class="chip-container">
+                <span class="chip chip-muted">None detected</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Footer -->
+      <footer class="app-footer">
+        <button id="btn-copy-report" class="btn btn-secondary btn-sm">
+          <svg class="icon-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          <span>Copy Summary</span>
+        </button>
+
+        <button id="btn-view-leaderboard" class="btn btn-secondary btn-sm">
+          <svg class="icon-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+          <span>Leaderboard</span>
+        </button>
+
+        <button id="btn-reanalyze" class="btn btn-primary btn-sm">
+          <svg class="icon-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          <span>Re-Analyze</span>
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
