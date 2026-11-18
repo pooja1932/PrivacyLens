@@ -9,7 +9,7 @@ const SETTINGS_KEY = "pl_settings";
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24 Hours
 
 const DEFAULT_SETTINGS = {
-  backendUrl: "http://localhost:8000",
+  backendUrl: "https://privacylens-api.onrender.com",
   mockMode: false,
   autoDetect: true
 };

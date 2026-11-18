@@ -627,7 +627,7 @@ Audited with PrivacyLens (Hybrid Rule-Based NLP + Structured LLM)`.trim();
 function handleOpenLeaderboard() {
   const domain = currentDomain || "";
   // Default to Person 3's local web app port or production Vercel URL
-  const leaderboardUrl = `http://localhost:3000/?domain=${encodeURIComponent(domain)}`;
+  const leaderboardUrl = `https://privacy-lens-gamma.vercel.app/?domain=${encodeURIComponent(domain)}`;
   if (typeof chrome !== "undefined" && chrome.tabs) {
     chrome.tabs.create({ url: leaderboardUrl });
   } else {
