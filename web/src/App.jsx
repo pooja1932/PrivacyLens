@@ -390,8 +390,8 @@ function PolicyDetailModal({ item, onClose }) {
   )
 }
 
-// ── Super League Table Component (Kayachira Super League style) ──────
-function SuperLeagueLeaderboard({
+// ── Table Component ──
+function Leaderboard({
   displayed,
   loading,
   search,
@@ -452,23 +452,23 @@ function SuperLeagueLeaderboard({
           </div>
         </div>
 
-        {/* Kayachira Super League Styled Table Box */}
-        <div className="super-league-card">
+        {/* Kayachira Trustworthy score Styled Table Box */}
+        <div className="Trustworthy-score-card">
           {/* Left Vertical Spine with Rotated "POINT TABLE" */}
-          <div className="league-vertical-spine">
+          <div className="score-vertical-spine">
             <div className="spine-teal-line" />
             <div className="spine-vertical-text">POINT TABLE</div>
           </div>
 
           {/* Right Tables Container */}
-          <div className="league-tables-container">
+          <div className="score-tables-container">
             {/* Top tournament / benchmark header */}
-            <div className="league-top-meta">
-              <div className="league-meta-title">
-                <h2>PrivacyLens League</h2>
+            <div className="score-top-meta">
+              <div className="score-meta-title">
+                <h2>PrivacyLens score</h2>
                 <p>2026 Season • Trustworthy AI Benchmark</p>
               </div>
-              <div className="league-trophy-badge">
+              <div className="score-trophy-badge">
                 <Icons.Trophy />
                 <span>{displayed.length} Evaluated</span>
               </div>
@@ -476,7 +476,7 @@ function SuperLeagueLeaderboard({
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
-                Loading league point table...
+                Loading score point table...
               </div>
             ) : displayed.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
@@ -491,7 +491,7 @@ function SuperLeagueLeaderboard({
                       <div className="pool-name">POOL A • HIGH TRUST & TRANSPARENCY</div>
                       <div className="pool-stats-legend">WORDS · VAGUE · DATA · GRADE · PTS</div>
                     </div>
-                    <table className="league-table-grid">
+                    <table className="score-table-grid">
                       <thead>
                         <tr>
                           <th>Platform / Domain</th>
@@ -507,7 +507,7 @@ function SuperLeagueLeaderboard({
                           const sold = getSoldTag(item.ai_structured_insights?.data_sold)
                           const crest = getCrestInitials(item.domain)
                           return (
-                            <tr key={item.domain} className="league-tr" onClick={() => onSelectItem(item)}>
+                            <tr key={item.domain} className="score-tr" onClick={() => onSelectItem(item)}>
                               <td>
                                 <div className="crest-cell">
                                   <div className="crest-shield">{crest}</div>
@@ -556,7 +556,7 @@ function SuperLeagueLeaderboard({
                       </div>
                       <div className="pool-stats-legend">WORDS · VAGUE · DATA · GRADE · PTS</div>
                     </div>
-                    <table className="league-table-grid">
+                    <table className="score-table-grid">
                       <thead>
                         <tr>
                           <th>Platform / Domain</th>
@@ -572,7 +572,7 @@ function SuperLeagueLeaderboard({
                           const sold = getSoldTag(item.ai_structured_insights?.data_sold)
                           const crest = getCrestInitials(item.domain)
                           return (
-                            <tr key={item.domain} className="league-tr" onClick={() => onSelectItem(item)}>
+                            <tr key={item.domain} className="score-tr" onClick={() => onSelectItem(item)}>
                               <td>
                                 <div className="crest-cell">
                                   <div className="crest-shield" style={{ background: '#fee2e2', color: '#991b1b', borderColor: '#fca5a5' }}>
@@ -616,12 +616,12 @@ function SuperLeagueLeaderboard({
                   </div>
                 )}
 
-                {/* League Footer Strip */}
-                <div className="league-footer-strip">
-                  <div className="league-footer-text">
+                {/* score Footer Strip */}
+                <div className="score-footer-strip">
+                  <div className="score-footer-text">
                     Continuous AI Auditing • Trustworthy AI Research
                   </div>
-                  <div className="league-footer-mark" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div className="score-footer-mark" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <img src="/logo.png" alt="PrivacyLens" style={{ height: '22px', width: 'auto' }} />
                     <span>PRIVACY LENS</span>
                   </div>
@@ -805,8 +805,8 @@ export default function App() {
       {/* ── Policy Analyzer Accordion ── */}
       <PolicyAnalyzerAccordion onResult={handleAnalyzeResult} />
 
-      {/* ── Kayachira Super League Leaderboard ── */}
-      <SuperLeagueLeaderboard
+      {/* ── Kayachira Trustworthy score Leaderboard ── */}
+      <Leaderboard
         displayed={displayed}
         loading={loading}
         search={search}
