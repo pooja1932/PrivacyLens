@@ -1,317 +1,157 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { MOCK_LEADERBOARD, MOCK_STATS } from './mockData'
 import './index.css'
 
-// ── Config ──────────────────────────────────────────────────────
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-// ── Helpers ─────────────────────────────────────────────────────
-function getScoreColor(score) {
-  if (score >= 80) return 'score-green'
-  if (score >= 65) return 'score-yellow'
-  if (score >= 50) return 'score-orange'
-  return 'score-red'
-}
-
-function getScoreBg(score) {
-  if (score >= 80) return 'bg-green'
-  if (score >= 65) return 'bg-yellow'
-  if (score >= 50) return 'bg-orange'
-  return 'bg-red'
-}
-
-function getGradeBadgeClass(grade) {
-  if (grade?.startsWith('A')) return 'badge-green'
-  if (grade === 'B') return 'badge-yellow'
-  if (grade === 'C') return 'badge-orange'
-  return 'badge-red'
+// ── Helpers ───────────────────────────────────────────────────────────
+function getGradeClass(grade) {
+  if (grade?.startsWith('A')) return 'badge-a'
+  if (grade === 'B') return 'badge-b'
+  if (grade === 'C') return 'badge-c'
+  return 'badge-d'
 }
 
 function getSoldTag(sold) {
-  if (sold === 'YES') return { cls: 'sold-yes', icon: '💸', label: 'Sells Data' }
-  if (sold === 'NO')  return { cls: 'sold-no',  icon: '✅', label: 'Safe' }
-  return { cls: 'sold-unclear', icon: '❓', label: 'Unclear' }
+  if (sold === 'YES') return { cls: 'sold-pill-yes', label: 'Sells Data' }
+  if (sold === 'NO')  return { cls: 'sold-pill-no', label: 'Safe' }
+  return { cls: 'sold-pill-unclear', label: 'Unclear' }
 }
 
-function getFaviconEmoji(domain) {
-  const map = {
-    'github.com': '🐙', 'stackoverflow.com': '📚', 'notion.so': '📝',
-    'discord.com': '💬', 'spotify.com': '🎵', 'chegg.com': '📖',
-    'quizlet.com': '🃏', 'duolingo.com': '🦜', 'coursera.org': '🎓',
-    'instructure.com': '🏫',
+function getCrestInitials(domain) {
+  const clean = domain.replace(/\.(com|org|net|so|io|edu|ac\.in)$/, '')
+  const parts = clean.split(/[-_.]/)
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
   }
-  return map[domain] || '🌐'
+  return clean.slice(0, 2).toUpperCase()
 }
 
-function scoreToGrade(score) {
-  if (score >= 90) return 'A+'
-  if (score >= 80) return 'A'
-  if (score >= 70) return 'B'
-  if (score >= 60) return 'C'
-  if (score >= 50) return 'D'
-  return 'F'
-}
-
-// ── Stats Card ───────────────────────────────────────────────────
-function StatCard({ value, label }) {
+// ── Branded Logo Component ──────────────────────────────────────────
+function PrivacyLensLogo({ size = 44 }) {
   return (
-    <div className="stat-card">
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
-    </div>
+    <img
+      src="/logo.png"
+      alt="PrivacyLens Logo"
+      className="brand-logo-img"
+      style={{ width: size, height: 'auto', maxHeight: size }}
+    />
   )
 }
 
-// ── Leaderboard Row ──────────────────────────────────────────────
-function LbRow({ item, rank, onClick }) {
-  const sold = getSoldTag(item.ai_structured_insights?.data_sold)
-  const scoreColor = getScoreColor(item.final_trust_score)
-  const scoreBg = getScoreBg(item.final_trust_score)
-  const gradeClass = getGradeBadgeClass(item.grade)
-  const cssColor = item.final_trust_score >= 80 ? 'var(--green)'
-                 : item.final_trust_score >= 65 ? 'var(--yellow)'
-                 : item.final_trust_score >= 50 ? 'var(--orange)'
-                 : 'var(--red)'
+// ── SVG Icons ─────────────────────────────────────────────────────────
+const Icons = {
+  Search: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  ),
+  ChevronDown: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  ),
+  Close: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  ),
+  Check: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  ),
+  Warning: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  ),
+  Trophy: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+    </svg>
+  ),
+  ShieldCheck: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <polyline points="9 12 11 14 15 10"/>
+    </svg>
+  ),
+  Microscope: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 18h8"/><path d="M3 22h18"/><path d="M14 22a7 7 0 1 0 0-14h-1"/><path d="M9 14h2"/><path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z"/><path d="M12 6V3a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v3"/>
+    </svg>
+  ),
+  Lock: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  ),
+  Sparkles: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+    </svg>
+  ),
+}
+
+// ── Soft Per-Character Typed/Fade-in Title Component ──────────────────
+function AnimatedHeadline({ line1, line2Accent }) {
+  const combined = `${line1} ${line2Accent}`
+  const words = combined.split(' ')
+  let globalCharIdx = 0
 
   return (
-    <div
-      className="lb-row"
-      style={{ '--score-color': cssColor }}
-      onClick={() => onClick(item)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onClick(item)}
-      aria-label={`View full report for ${item.domain}`}
-    >
-      {/* Rank */}
-      <div className={`rank ${rank <= 3 ? 'top-3' : ''}`}>
-        {rank <= 3 ? ['🥇','🥈','🥉'][rank - 1] : `#${rank}`}
-      </div>
-
-      {/* Domain */}
-      <div className="domain-info">
-        <div className="domain-favicon">{getFaviconEmoji(item.domain)}</div>
-        <div>
-          <div className="domain-name">{item.domain}</div>
-          <div className="domain-meta">
-            <span>{item.deterministic_metrics?.word_count?.toLocaleString()} words</span>
-            <span>·</span>
-            <span>{item.sections_found?.length || 0} sections</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Trust Score */}
-      <div className="score-cell">
-        <div className={`score-number ${scoreColor}`}>{item.final_trust_score}</div>
-        <div className="score-bar">
-          <div className={`score-bar-fill ${scoreBg}`} style={{ width: `${item.final_trust_score}%` }} />
-        </div>
-      </div>
-
-      {/* Grade */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <div className={`grade-badge ${gradeClass}`}>{item.grade}</div>
-      </div>
-
-      {/* Data Sold */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <span className={`sold-tag ${sold.cls}`}>
-          {sold.icon} {sold.label}
-        </span>
-      </div>
-
-      {/* Vague Count */}
-      <div className="vague-count">
-        {item.deterministic_metrics?.vague_phrases_count ?? '—'}<br/>
-        <span style={{ fontSize: '0.68rem' }}>vague</span>
-      </div>
-    </div>
+    <h1 className="hero-headline">
+      {words.map((word, wIdx) => {
+        const isAccent = word === line2Accent || line2Accent.includes(word)
+        return (
+          <span key={wIdx} style={{ display: 'inline-block', whiteSpace: 'nowrap' }}>
+            {isAccent ? (
+              <em>
+                {word.split('').map((char) => {
+                  const delay = globalCharIdx++ * 36
+                  return (
+                    <span
+                      key={`${wIdx}-${char}-${delay}`}
+                      className="char"
+                      style={{ animationDelay: `${delay}ms` }}
+                    >
+                      {char}
+                    </span>
+                  )
+                })}
+              </em>
+            ) : (
+              word.split('').map((char) => {
+                const delay = globalCharIdx++ * 36
+                return (
+                  <span
+                    key={`${wIdx}-${char}-${delay}`}
+                    className="char"
+                    style={{ animationDelay: `${delay}ms` }}
+                  >
+                    {char}
+                  </span>
+                )
+              })
+            )}
+            {wIdx < words.length - 1 && (
+              <span className="char-space" style={{ animationDelay: `${globalCharIdx++ * 36}ms` }}>
+                &nbsp;
+              </span>
+            )}
+          </span>
+        )
+      })}
+    </h1>
   )
 }
 
-// ── Detail Modal ─────────────────────────────────────────────────
-function DetailModal({ item, onClose }) {
-  const ai = item.ai_structured_insights || {}
-  const dm = item.deterministic_metrics || {}
-  const sold = getSoldTag(ai.data_sold)
-  const scoreColor = getScoreColor(item.final_trust_score)
-  const gradeClass = getGradeBadgeClass(item.grade)
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = e => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        {/* Header */}
-        <div className="modal-header">
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-              <span style={{ fontSize: '1.8rem' }}>{getFaviconEmoji(item.domain)}</span>
-              <h2 className="modal-domain" id="modal-title">{item.domain}</h2>
-            </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <span className={`sold-tag ${sold.cls}`}>{sold.icon} {sold.label}</span>
-              {item.cached && (
-                <span className="sold-tag" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.3)', color: 'var(--accent-light)' }}>
-                  ⚡ Cached Result
-                </span>
-              )}
-            </div>
-          </div>
-          <button className="modal-close" onClick={onClose} aria-label="Close modal">✕</button>
-        </div>
-
-        {/* Body */}
-        <div className="modal-body">
-          {/* Score Row */}
-          <div className="modal-score-row">
-            <div className={`modal-score-number ${scoreColor}`}>{item.final_trust_score}</div>
-            <div className={`modal-grade ${gradeClass}`}>{item.grade}</div>
-            <div className="modal-score-meta">
-              <div className="modal-score-label">Overall Trust Score</div>
-              {item.score_deductions?.length > 0 && (
-                <div className="deduction-list">
-                  {item.score_deductions.map((d, i) => (
-                    <div key={i} className="deduction-item">{d}</div>
-                  ))}
-                </div>
-              )}
-              {!item.score_deductions?.length && (
-                <div style={{ fontSize: '0.8rem', color: 'var(--green)' }}>✓ No major deductions</div>
-              )}
-            </div>
-          </div>
-
-          {/* 1. Deterministic NLP metrics */}
-          <div className="modal-section">
-            <div className="modal-section-title">🔬 Deterministic NLP Analysis</div>
-            <div className="metrics-grid">
-              <div className="metric-box">
-                <div className="metric-box-value">{dm.transparency_score ?? '—'}</div>
-                <div className="metric-box-label">Transparency Score</div>
-              </div>
-              <div className="metric-box">
-                <div className="metric-box-value" style={{ color: dm.vague_phrases_count > 5 ? 'var(--red)' : 'var(--green)' }}>
-                  {dm.vague_phrases_count ?? '—'}
-                </div>
-                <div className="metric-box-label">Vague Phrases</div>
-              </div>
-              <div className="metric-box">
-                <div className="metric-box-value">{dm.word_count?.toLocaleString() ?? '—'}</div>
-                <div className="metric-box-label">Word Count</div>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Data types collected */}
-          {ai.key_data_types?.length > 0 && (
-            <div className="modal-section">
-              <div className="modal-section-title">🗂️ Data Types Collected</div>
-              <div className="tag-list">
-                {ai.key_data_types.map((t, i) => <span key={i} className="tag">{t}</span>)}
-              </div>
-            </div>
-          )}
-
-          {/* 3. Third-party sharing */}
-          {ai.third_party_sharing?.length > 0 && (
-            <div className="modal-section">
-              <div className="modal-section-title">🤝 Third-Party Sharing</div>
-              <div className="tag-list">
-                {ai.third_party_sharing.map((t, i) => (
-                  <span key={i} className="tag" style={{ borderColor: 'rgba(249,115,22,0.3)', color: 'var(--orange)' }}>{t}</span>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 4. Retention */}
-          <div className="modal-section">
-            <div className="modal-section-title">🕐 Data Retention Period</div>
-            <div style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '12px 16px',
-              fontSize: '0.9rem',
-              color: ai.retention_period === 'Not Specified' ? 'var(--red)' : 'var(--text-primary)',
-              fontFamily: 'var(--font-mono)',
-            }}>
-              {ai.retention_period || 'Not Specified'}
-            </div>
-          </div>
-
-          {/* 5. Key risks */}
-          {ai.key_risks?.length > 0 && (
-            <div className="modal-section">
-              <div className="modal-section-title">⚠️ Key Privacy Risks</div>
-              <div className="risk-list">
-                {ai.key_risks.map((r, i) => (
-                  <div key={i} className="risk-item">
-                    <span className="risk-icon">⚠</span>
-                    <span>{r}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 6. User rights */}
-          {ai.user_rights?.length > 0 && (
-            <div className="modal-section">
-              <div className="modal-section-title">🛡️ Your Rights</div>
-              <div className="rights-list">
-                {ai.user_rights.map((r, i) => (
-                  <div key={i} className="right-item">
-                    <span className="right-icon">✓</span>
-                    <span>{r}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 7. Trustworthy AI pillars */}
-          <div className="modal-section">
-            <div className="modal-section-title">🤖 Trustworthy AI Transparency</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { icon: '🔎', label: 'Explainability', desc: 'Score backed by deterministic regex + spaCy NLP — not a black-box LLM decision.' },
-                { icon: '🔒', label: 'Privacy-by-Design', desc: 'Zero personal user data collected. Only public policy text is sent to the backend.' },
-                { icon: '💪', label: 'Robustness', desc: 'Section-based chunking + 30-day MongoDB cache prevents hallucinations and redundant API calls.' },
-              ].map(({ icon, label, desc }) => (
-                <div key={label} style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)',
-                  padding: '12px 14px',
-                  display: 'flex',
-                  gap: 12,
-                  alignItems: 'flex-start',
-                }}>
-                  <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{icon}</span>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: 4 }}>{label}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Analyze Tool ─────────────────────────────────────────────────
-function AnalyzeTool({ onResult }) {
+// ── Accordion Policy Analyzer ─────────────────────────────────────────
+function PolicyAnalyzerAccordion({ onResult }) {
+  const [isOpen, setIsOpen] = useState(false)
   const [domain, setDomain] = useState('')
   const [policyText, setPolicyText] = useState('')
   const [loading, setLoading] = useState(false)
@@ -337,47 +177,465 @@ function AnalyzeTool({ onResult }) {
       setResult(data)
       onResult(data)
     } catch (e) {
-      setError(`Failed to reach backend: ${e.message}. Make sure the FastAPI server is running.`)
+      setError(`Failed to reach backend: ${e.message}. (FastAPI server offline or unreached)`)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="analyze-section">
-      <h2>🔍 Analyze Any Privacy Policy</h2>
-      <p>Paste any privacy policy text below and get an instant Trust Score powered by our Hybrid NLP + AI pipeline.</p>
-      <div className="analyze-form">
-        <input
-          id="domain-input"
-          className="domain-input"
-          placeholder="Domain (e.g. notion.so) — optional"
-          value={domain}
-          onChange={e => setDomain(e.target.value)}
-        />
-        <textarea
-          id="policy-text-input"
-          className="policy-textarea"
-          placeholder="Paste privacy policy text here (minimum 100 characters)..."
-          value={policyText}
-          onChange={e => setPolicyText(e.target.value)}
-          rows={6}
-        />
-        {error && <div style={{ color: 'var(--red)', fontSize: '0.82rem', textAlign: 'left' }}>{error}</div>}
-        <button id="analyze-btn" className="analyze-btn" onClick={handleAnalyze} disabled={loading}>
-          {loading ? '⏳ Analyzing…' : '⚡ Analyze Policy'}
-        </button>
-      </div>
-      {result && (
-        <div className="analyze-result">
-          {JSON.stringify(result, null, 2)}
+    <section className="analyzer-section" id="analyzer">
+      <div className="container">
+        <div className="analyzer-accordion-card">
+          <button
+            className="accordion-header-btn"
+            onClick={() => setIsOpen((prev) => !prev)}
+            aria-expanded={isOpen}
+          >
+            <div className="accordion-title-group">
+              <div className="accordion-icon-box">
+                <Icons.Microscope />
+              </div>
+              <div className="accordion-title-text">
+                <h3>Policy Analyzer</h3>
+                <p>Run instant deterministic NLP + structured AI evaluation on any policy</p>
+              </div>
+            </div>
+            <div className={`accordion-chevron-icon ${isOpen ? 'is-open' : ''}`}>
+              <Icons.ChevronDown />
+            </div>
+          </button>
+
+          <div className={`accordion-collapse ${isOpen ? 'is-open' : ''}`}>
+            <div className="accordion-content-inner">
+              <div className="accordion-body-padding">
+                <div className="analyzer-grid-form">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="domain-input">Target Domain (optional)</label>
+                    <input
+                      id="domain-input"
+                      className="input-light"
+                      placeholder="e.g. notion.so, spotify.com"
+                      value={domain}
+                      onChange={(e) => setDomain(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ justifyContent: 'flex-end' }}>
+                    <button
+                      className="btn-teal-primary"
+                      onClick={handleAnalyze}
+                      disabled={loading}
+                      style={{ height: '45px' }}
+                    >
+                      {loading ? 'Processing Evaluation...' : 'Run Analysis'}
+                    </button>
+                  </div>
+
+                  <div className="form-group full-span">
+                    <label className="form-label" htmlFor="policy-text-input">Privacy Policy Text Content</label>
+                    <textarea
+                      id="policy-text-input"
+                      className="input-light textarea-light"
+                      placeholder="Paste raw policy text here (minimum 100 characters)..."
+                      value={policyText}
+                      onChange={(e) => setPolicyText(e.target.value)}
+                      rows={5}
+                    />
+                  </div>
+                </div>
+
+                {error && <div className="alert-box-error">{error}</div>}
+
+                {result && (
+                  <div className="analysis-result-json">
+                    {JSON.stringify(result, null, 2)}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
+    </section>
+  )
+}
+
+// ── Detail Modal ──────────────────────────────────────────────────────
+function PolicyDetailModal({ item, onClose }) {
+  const ai = item.ai_structured_insights || {}
+  const dm = item.deterministic_metrics || {}
+  const sold = getSoldTag(ai.data_sold)
+  const gradeClass = getGradeClass(item.grade)
+
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+        <div className="modal-header-bar">
+          <div>
+            <h2 className="modal-domain-heading">{item.domain}</h2>
+            <div className="modal-tags-row">
+              <span className={`sold-pill ${sold.cls}`}>
+                <span className="sold-dot" />
+                {sold.label}
+              </span>
+              {item.cached && (
+                <span className="sold-pill" style={{ background: 'var(--mint-100)', color: 'var(--teal-800)' }}>
+                  Cached Result
+                </span>
+              )}
+            </div>
+          </div>
+          <button className="modal-close-btn" onClick={onClose} aria-label="Close">
+            <Icons.Close />
+          </button>
+        </div>
+
+        <div className="modal-body-content">
+          <div className="modal-score-highlight">
+            <div className="modal-score-digit">{item.final_trust_score}</div>
+            <div className={`modal-grade-pill ${gradeClass}`}>{item.grade}</div>
+            <div className="modal-score-info">
+              <div className="modal-score-legend">Overall Trust Score (PTS)</div>
+              {item.score_deductions?.length > 0 ? (
+                <div>
+                  {item.score_deductions.map((d, i) => (
+                    <div key={i} className="deduction-pill">{d}</div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.8rem', color: 'var(--status-green)', fontWeight: 600 }}>
+                  High Transparency · No Major Deductions
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="modal-detail-section">
+            <div className="modal-section-h4">Deterministic NLP Metrics</div>
+            <div className="metrics-3col">
+              <div className="metric-card-lite">
+                <div className="metric-card-digit">{dm.transparency_score ?? '—'}</div>
+                <div className="metric-card-lbl">Transparency</div>
+              </div>
+              <div className="metric-card-lite">
+                <div className="metric-card-digit" style={{ color: dm.vague_phrases_count > 4 ? 'var(--status-red)' : 'var(--status-green)' }}>
+                  {dm.vague_phrases_count ?? '—'}
+                </div>
+                <div className="metric-card-lbl">Vague Phrases</div>
+              </div>
+              <div className="metric-card-lite">
+                <div className="metric-card-digit">{dm.word_count?.toLocaleString() ?? '—'}</div>
+                <div className="metric-card-lbl">Word Count</div>
+              </div>
+            </div>
+          </div>
+
+          {ai.key_data_types?.length > 0 && (
+            <div className="modal-detail-section">
+              <div className="modal-section-h4">Data Collected</div>
+              <div className="tag-cloud">
+                {ai.key_data_types.map((t, idx) => (
+                  <span key={idx} className="data-tag">{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {ai.third_party_sharing?.length > 0 && (
+            <div className="modal-detail-section">
+              <div className="modal-section-h4">Third-Party Sharing</div>
+              <div className="tag-cloud">
+                {ai.third_party_sharing.map((t, idx) => (
+                  <span key={idx} className="data-tag" style={{ background: '#fff7ed', color: '#c2410c', borderColor: '#fed7aa' }}>
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {ai.key_risks?.length > 0 && (
+            <div className="modal-detail-section">
+              <div className="modal-section-h4">Identified Risks</div>
+              {ai.key_risks.map((r, idx) => (
+                <div key={idx} className="risk-alert-box">
+                  <Icons.Warning />
+                  <span>{r}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {ai.user_rights?.length > 0 && (
+            <div className="modal-detail-section">
+              <div className="modal-section-h4">User Rights</div>
+              {ai.user_rights.map((r, idx) => (
+                <div key={idx} className="right-alert-box">
+                  <Icons.Check />
+                  <span>{r}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
-// ── Main App ─────────────────────────────────────────────────────
+// ── Super League Table Component (Kayachira Super League style) ──────
+function SuperLeagueLeaderboard({
+  displayed,
+  loading,
+  search,
+  setSearch,
+  filterSold,
+  setFilterSold,
+  sortBy,
+  setSortBy,
+  onSelectItem,
+}) {
+  // Group into Pool A (High Trust >= 70) and Pool B (Moderate & Risk < 70)
+  // or when searching, display matching results in their respective pools
+  const poolA = displayed.filter((item) => item.final_trust_score >= 70)
+  const poolB = displayed.filter((item) => item.final_trust_score < 70)
+
+  return (
+    <section className="leaderboard-section" id="leaderboard">
+      <div className="container">
+        {/* Filter controls */}
+        <div className="lb-filter-bar">
+          <div className="search-input-wrap">
+            <span className="search-icon"><Icons.Search /></span>
+            <input
+              type="text"
+              className="search-field"
+              placeholder="Search domains (e.g. github, spotify)..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search domains"
+            />
+          </div>
+
+          <div className="filter-pills-row">
+            <select
+              className="filter-select"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              aria-label="Sort table"
+            >
+              <option value="highest">PTS: High to Low</option>
+              <option value="lowest">PTS: Low to High</option>
+              <option value="recent">Recently Audited</option>
+            </select>
+
+            {[
+              { id: 'all', label: 'All Domains' },
+              { id: 'no', label: 'Safe Only' },
+              { id: 'yes', label: 'Sells Data' },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                className={`pill-filter-btn ${filterSold === id ? 'is-active' : ''}`}
+                onClick={() => setFilterSold(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Kayachira Super League Styled Table Box */}
+        <div className="super-league-card">
+          {/* Left Vertical Spine with Rotated "POINT TABLE" */}
+          <div className="league-vertical-spine">
+            <div className="spine-teal-line" />
+            <div className="spine-vertical-text">POINT TABLE</div>
+          </div>
+
+          {/* Right Tables Container */}
+          <div className="league-tables-container">
+            {/* Top tournament / benchmark header */}
+            <div className="league-top-meta">
+              <div className="league-meta-title">
+                <h2>PrivacyLens League</h2>
+                <p>2026 Season • Trustworthy AI Benchmark</p>
+              </div>
+              <div className="league-trophy-badge">
+                <Icons.Trophy />
+                <span>{displayed.length} Evaluated</span>
+              </div>
+            </div>
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
+                Loading league point table...
+              </div>
+            ) : displayed.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
+                No platform policies match the selected filter.
+              </div>
+            ) : (
+              <>
+                {/* POOL A: High Trust Tier */}
+                {poolA.length > 0 && (
+                  <div className="pool-block">
+                    <div className="pool-header-row">
+                      <div className="pool-name">POOL A • HIGH TRUST & TRANSPARENCY</div>
+                      <div className="pool-stats-legend">WORDS · VAGUE · DATA · GRADE · PTS</div>
+                    </div>
+                    <table className="league-table-grid">
+                      <thead>
+                        <tr>
+                          <th>Platform / Domain</th>
+                          <th className="c">Words</th>
+                          <th className="c">Vague</th>
+                          <th className="c">Data Sold</th>
+                          <th className="c">Grade</th>
+                          <th className="th-pts">PTS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {poolA.map((item) => {
+                          const sold = getSoldTag(item.ai_structured_insights?.data_sold)
+                          const crest = getCrestInitials(item.domain)
+                          return (
+                            <tr key={item.domain} className="league-tr" onClick={() => onSelectItem(item)}>
+                              <td>
+                                <div className="crest-cell">
+                                  <div className="crest-shield">{crest}</div>
+                                  <div>
+                                    <div className="team-domain-name">{item.domain}</div>
+                                    <div className="team-domain-meta">
+                                      <span>{item.sections_found?.length || 0} Sections</span>
+                                      <span>•</span>
+                                      <span>Verified</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="c num-metric">
+                                {item.deterministic_metrics?.word_count?.toLocaleString() || '—'}
+                              </td>
+                              <td className="c num-metric">
+                                {item.deterministic_metrics?.vague_phrases_count ?? '—'}
+                              </td>
+                              <td className="c">
+                                <span className={`sold-pill ${sold.cls}`}>
+                                  <span className="sold-dot" />
+                                  {sold.label}
+                                </span>
+                              </td>
+                              <td className="c">
+                                <span className={`grade-badge-sm ${getGradeClass(item.grade)}`}>
+                                  {item.grade}
+                                </span>
+                              </td>
+                              <td className="td-pts">{item.final_trust_score}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* POOL B: Caution & High Risk Tier */}
+                {poolB.length > 0 && (
+                  <div className="pool-block">
+                    <div className="pool-header-row" style={{ background: '#0f3d36' }}>
+                      <div className="pool-name" style={{ color: '#99f6e4' }}>
+                        POOL B • CAUTION & DATA MONETIZATION
+                      </div>
+                      <div className="pool-stats-legend">WORDS · VAGUE · DATA · GRADE · PTS</div>
+                    </div>
+                    <table className="league-table-grid">
+                      <thead>
+                        <tr>
+                          <th>Platform / Domain</th>
+                          <th className="c">Words</th>
+                          <th className="c">Vague</th>
+                          <th className="c">Data Sold</th>
+                          <th className="c">Grade</th>
+                          <th className="th-pts" style={{ background: '#0f766e' }}>PTS</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {poolB.map((item) => {
+                          const sold = getSoldTag(item.ai_structured_insights?.data_sold)
+                          const crest = getCrestInitials(item.domain)
+                          return (
+                            <tr key={item.domain} className="league-tr" onClick={() => onSelectItem(item)}>
+                              <td>
+                                <div className="crest-cell">
+                                  <div className="crest-shield" style={{ background: '#fee2e2', color: '#991b1b', borderColor: '#fca5a5' }}>
+                                    {crest}
+                                  </div>
+                                  <div>
+                                    <div className="team-domain-name">{item.domain}</div>
+                                    <div className="team-domain-meta">
+                                      <span>{item.sections_found?.length || 0} Sections</span>
+                                      <span>•</span>
+                                      <span>Audit Flagged</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="c num-metric">
+                                {item.deterministic_metrics?.word_count?.toLocaleString() || '—'}
+                              </td>
+                              <td className="c num-metric" style={{ color: 'var(--status-red)' }}>
+                                {item.deterministic_metrics?.vague_phrases_count ?? '—'}
+                              </td>
+                              <td className="c">
+                                <span className={`sold-pill ${sold.cls}`}>
+                                  <span className="sold-dot" />
+                                  {sold.label}
+                                </span>
+                              </td>
+                              <td className="c">
+                                <span className={`grade-badge-sm ${getGradeClass(item.grade)}`}>
+                                  {item.grade}
+                                </span>
+                              </td>
+                              <td className="td-pts" style={{ background: '#0f766e' }}>
+                                {item.final_trust_score}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* League Footer Strip */}
+                <div className="league-footer-strip">
+                  <div className="league-footer-text">
+                    Continuous AI Auditing • Trustworthy AI Research
+                  </div>
+                  <div className="league-footer-mark" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <img src="/logo.png" alt="PrivacyLens" style={{ height: '22px', width: 'auto' }} />
+                    <span>PRIVACY LENS</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ── Main Application Component ────────────────────────────────────────
 export default function App() {
   const [leaderboard, setLeaderboard] = useState([])
   const [stats, setStats] = useState(null)
@@ -389,7 +647,6 @@ export default function App() {
   const [sortBy, setSortBy] = useState('highest')
   const [selectedItem, setSelectedItem] = useState(null)
 
-  // Fetch from backend, fall back to mock data
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
@@ -397,13 +654,12 @@ export default function App() {
         fetch(`${API_BASE}/api/v1/leaderboard?sort_by=${sortBy}&filter_sold=${filterSold}&search=${search}&limit=200`),
         fetch(`${API_BASE}/api/v1/stats`),
       ])
-      if (!lbRes.ok || !statsRes.ok) throw new Error('Non-OK response')
+      if (!lbRes.ok || !statsRes.ok) throw new Error('Backend unreached')
       const [lbData, statsData] = await Promise.all([lbRes.json(), statsRes.json()])
       setLeaderboard(lbData.results || [])
       setStats(statsData)
       setUsingMock(false)
     } catch {
-      // Backend not running — show mock data
       setLeaderboard(MOCK_LEADERBOARD)
       setStats(MOCK_STATS)
       setUsingMock(true)
@@ -412,13 +668,19 @@ export default function App() {
     }
   }, [sortBy, filterSold, search])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
-  // Client-side filter/sort for mock mode (backend handles it natively)
   const displayed = usingMock
     ? MOCK_LEADERBOARD
-        .filter(i => !search || i.domain.includes(search.toLowerCase()))
-        .filter(i => filterSold === 'all' || (filterSold === 'yes' ? i.ai_structured_insights?.data_sold === 'YES' : i.ai_structured_insights?.data_sold !== 'YES'))
+        .filter((i) => !search || i.domain.toLowerCase().includes(search.toLowerCase()))
+        .filter((i) =>
+          filterSold === 'all' ||
+          (filterSold === 'yes'
+            ? i.ai_structured_insights?.data_sold === 'YES'
+            : i.ai_structured_insights?.data_sold !== 'YES')
+        )
         .sort((a, b) => {
           if (sortBy === 'lowest') return a.final_trust_score - b.final_trust_score
           if (sortBy === 'recent') return new Date(b.analyzed_at) - new Date(a.analyzed_at)
@@ -427,170 +689,153 @@ export default function App() {
     : leaderboard
 
   const handleAnalyzeResult = (result) => {
-    // Prepend fresh result to leaderboard display
-    setLeaderboard(prev => {
-      const filtered = prev.filter(i => i.domain !== result.domain)
+    setLeaderboard((prev) => {
+      const filtered = prev.filter((i) => i.domain !== result.domain)
       return [result, ...filtered]
     })
-    setStats(prev => prev ? {
-      ...prev,
-      total_analyzed: prev.total_analyzed + (leaderboard.find(i => i.domain === result.domain) ? 0 : 1),
-    } : prev)
+    setStats((prev) =>
+      prev
+        ? {
+            ...prev,
+            total_analyzed: prev.total_analyzed + (leaderboard.find((i) => i.domain === result.domain) ? 0 : 1),
+          }
+        : prev
+    )
   }
 
   return (
     <div className="app">
-      {/* Navbar */}
-      <nav className="navbar" role="navigation">
+      {/* ── Sticky Navbar with Custom Logo ── */}
+      <header className="navbar">
         <div className="container navbar-inner">
-          <a href="/" className="logo" aria-label="PrivacyLens Home">
-            <div className="logo-icon">🛡️</div>
-            PrivacyLens
-          </a>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span className="nav-badge">BETA</span>
-            {usingMock && (
-              <span className="nav-badge" style={{ background: 'var(--yellow-dim)', borderColor: 'rgba(234,179,8,0.3)', color: 'var(--yellow)' }}>
-                📦 Demo Mode
-              </span>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <header className="hero">
-        <div className="hero-glow" />
-        <div className="container">
-          <div className="hero-tag">⚡ Hybrid NLP + Structured AI</div>
-          <h1>Privacy Policy Leaderboard</h1>
-          <p>
-            Transparent, explainable trust scores for the apps students use every day.
-            Powered by deterministic NLP + Gemini AI — never a blind LLM guess.
-          </p>
-          {stats && (
-            <div className="stats-row">
-              <StatCard value={stats.total_analyzed} label="Policies Analyzed" />
-              <StatCard value={`${stats.average_trust_score}/100`} label="Avg Trust Score" />
-              <StatCard value={`${stats.percent_selling_data}%`} label="Sites Selling Data" />
+          <a href="/" className="brand-link" aria-label="PrivacyLens Home">
+            <PrivacyLensLogo size={42} />
+            <div className="brand-text-block">
+              <div className="brand-title">
+                Privacy<span>Lens</span>
+              </div>
+              <div className="brand-subtitle">AI Policy Intelligence</div>
             </div>
-          )}
+          </a>
+
+          <ul className="nav-links">
+            <li><a href="#analyzer">Analyzer</a></li>
+            <li><a href="#leaderboard">Leaderboard</a></li>
+            <li>
+              <a href="https://github.com/pooja1932/PrivacyLens" target="_blank" rel="noreferrer">
+                GitHub
+              </a>
+            </li>
+          </ul>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="nav-badge-pill">BETA</span>
+            {usingMock && <span className="nav-badge-pill" style={{ background: '#fef3c7', color: '#92400e' }}>DEMO DATA</span>}
+          </div>
         </div>
       </header>
 
-      <main>
+      {/* ── Hero Section (Left Aligned Format following A-Space) ── */}
+      <section className="hero">
         <div className="container">
-          {/* Analyze Tool */}
-          <AnalyzeTool onResult={handleAnalyzeResult} />
+          <div className="hero-layout">
+            <div className="hero-left">
+              <div className="hero-tag">Deterministic NLP + Structured LLM</div>
 
-          {/* Leaderboard */}
-          <section className="leaderboard-section" aria-label="Privacy Policy Leaderboard">
-            {/* Controls */}
-            <div className="controls">
-              <div className="search-wrap">
-                <span className="search-icon">🔍</span>
-                <input
-                  id="leaderboard-search"
-                  type="text"
-                  className="search-input"
-                  placeholder="Search domains…"
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  aria-label="Search domains"
-                />
-              </div>
-              <div className="filter-group">
-                <select
-                  id="sort-select"
-                  className="filter-btn"
-                  value={sortBy}
-                  onChange={e => setSortBy(e.target.value)}
-                  aria-label="Sort leaderboard"
-                >
-                  <option value="highest">↑ Highest Score</option>
-                  <option value="lowest">↓ Lowest Score</option>
-                  <option value="recent">🕐 Most Recent</option>
-                </select>
-                {['all', 'no', 'yes'].map(f => (
-                  <button
-                    key={f}
-                    id={`filter-sold-${f}`}
-                    className={`filter-btn ${filterSold === f ? 'active' : ''}`}
-                    onClick={() => setFilterSold(f)}
-                    aria-pressed={filterSold === f}
-                  >
-                    {f === 'all' ? '🌐 All' : f === 'no' ? '✅ Safe Only' : '💸 Sells Data'}
-                  </button>
-                ))}
+              {/* Per-character typing text effect */}
+              <AnimatedHeadline
+                line1="Privacy Policy"
+                line2Accent="Leaderboard"
+              />
+
+              <p className="hero-subtext">
+                Explainable, empirical trust scores for everyday digital platforms.
+                Evaluating data selling, clause ambiguity, and user consent through
+                transparent artificial intelligence.
+              </p>
+
+              <div className="hero-actions">
+                <a href="#analyzer" className="btn-teal-primary">
+                  Analyze A Policy
+                </a>
+                <a href="#leaderboard" className="btn-teal-outline">
+                  View Point Table
+                </a>
               </div>
             </div>
 
-            {/* Header row */}
-            <div className="section-header">
-              <span className="section-title">🏆 Domain Rankings</span>
-              <span className="count-badge">{displayed.length} domains</span>
-            </div>
-
-            {/* Column labels */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '40px 1fr 110px 90px 90px 80px',
-              gap: 16,
-              padding: '0 20px 10px',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: 'var(--text-muted)',
-            }}>
-              <span>#</span><span>Domain</span><span style={{textAlign:'center'}}>Score</span>
-              <span style={{textAlign:'center'}}>Grade</span>
-              <span style={{textAlign:'center'}}>Data Sold</span>
-              <span style={{textAlign:'center'}}>Vague</span>
-            </div>
-
-            {/* Body */}
-            {loading ? (
-              <>
-                <div className="spinner" />
-                <div className="loading-text">Loading leaderboard data…</div>
-              </>
-            ) : displayed.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">🔍</div>
-                <div className="empty-text">No domains match your filters.</div>
+            {/* Right KPI cards (following A-Space telemetry cards) */}
+            <div className="hero-right">
+              <div className="kpi-card">
+                <div className="kpi-details">
+                  <div className="kpi-number">{stats?.total_analyzed ?? 10}</div>
+                  <div className="kpi-label">Policies Evaluated</div>
+                </div>
+                <div className="kpi-badge-icon">
+                  <Icons.ShieldCheck />
+                </div>
               </div>
-            ) : (
-              <div className="leaderboard-grid">
-                {displayed.map((item, i) => (
-                  <LbRow
-                    key={item.domain}
-                    item={item}
-                    rank={i + 1}
-                    onClick={setSelectedItem}
-                  />
-                ))}
+
+              <div className="kpi-card">
+                <div className="kpi-details">
+                  <div className="kpi-number">{stats?.average_trust_score ?? 66.9}<span style={{ fontSize: '1rem', color: 'var(--text-muted)' }}>/100</span></div>
+                  <div className="kpi-label">Average Trust Rating</div>
+                </div>
+                <div className="kpi-badge-icon">
+                  <Icons.Sparkles />
+                </div>
               </div>
-            )}
-          </section>
+
+              <div className="kpi-card">
+                <div className="kpi-details">
+                  <div className="kpi-number" style={{ color: 'var(--status-red)' }}>
+                    {stats?.percent_selling_data ?? 30.0}%
+                  </div>
+                  <div className="kpi-label">Platforms Selling User Data</div>
+                </div>
+                <div className="kpi-badge-icon" style={{ background: '#fee2e2', color: 'var(--status-red)' }}>
+                  <Icons.Warning />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </main>
+      </section>
 
-      {/* Footer */}
-      <footer className="footer">
-        <div className="container">
-          <p>
-            PrivacyLens • Hybrid NLP + AI Policy Analyzer •{' '}
-            <a href="https://github.com/pooja1932/PrivacyLens" target="_blank" rel="noreferrer">GitHub</a>
-            {' '}• Built for Trustworthy AI Course Submission
-          </p>
+      {/* ── Policy Analyzer Accordion ── */}
+      <PolicyAnalyzerAccordion onResult={handleAnalyzeResult} />
+
+      {/* ── Kayachira Super League Leaderboard ── */}
+      <SuperLeagueLeaderboard
+        displayed={displayed}
+        loading={loading}
+        search={search}
+        setSearch={setSearch}
+        filterSold={filterSold}
+        setFilterSold={setFilterSold}
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        onSelectItem={setSelectedItem}
+      />
+
+      {/* ── Detail Modal ── */}
+      {selectedItem && (
+        <PolicyDetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
+
+      {/* ── Footer ── */}
+      <footer className="footer-bar">
+        <div className="container footer-content">
+          <div>
+            PrivacyLens • Trustworthy AI Privacy Policy Evaluation Framework
+          </div>
+          <div>
+            <a href="https://github.com/pooja1932/PrivacyLens" target="_blank" rel="noreferrer">
+              GitHub Repository
+            </a>
+          </div>
         </div>
       </footer>
-
-      {/* Detail Modal */}
-      {selectedItem && (
-        <DetailModal item={selectedItem} onClose={() => setSelectedItem(null)} />
-      )}
     </div>
   )
 }
